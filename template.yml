@@ -1,0 +1,155 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: Authentication serverless microservice
+Transform:
+    - AWS::Serverless-2016-10-31
+
+Parameters:
+    SuperAdminEmail:
+        Type: String
+        Description: The email address of the default user to be added to the Cognito user pool by default
+    AuthDomainName:
+        Type: String
+        Description: Prefix for the domain name Cognito uses for its UI (must be unique in the entire AWS)
+
+Globals:
+    Function:
+        Layers:
+            - !Ref RuntimeDependenciesLayer
+        Environment:
+            Variables:
+                SUPER_ADMIN_EMAIL: !Ref SuperAdminEmail
+        Runtime: nodejs14.x
+        MemorySize: 128
+        Timeout: 100
+
+Resources:
+    MsIdEventsFunction:
+        Type: AWS::Serverless::Function
+        Metadata:
+            BuildMethod: makefile
+        Properties:
+            Handler: dist/handlers/id-events.handler
+            Description: Authentication serverless microservice events handler
+            Runtime: nodejs14.x
+            Policies:
+                - Statement:
+                      - Effect: Allow
+                        Resource: '*'
+                        Action:
+                            - cognito-idp:AdminCreateUser
+                            - cognito-idp:AdminDeleteUser
+                            - cognito-idp:AdminGetUser
+
+    # Shared layer with Lambda runtime dependencies
+    RuntimeDependenciesLayer:
+        Type: AWS::Serverless::LayerVersion
+        Metadata:
+            BuildMethod: makefile
+        Properties:
+            LayerName: 'ms-id-dependencies'
+            Description: Runtime dependencies for Lambdas
+            ContentUri: ./
+            CompatibleRuntimes:
+                - nodejs14.x
+            RetentionPolicy: Retain
+
+    MsIdCognitoUserPool:
+        Type: AWS::Cognito::UserPool
+        Properties:
+            UserPoolName: MsId
+            Policies:
+                PasswordPolicy:
+                    MinimumLength: 8
+            UsernameAttributes:
+                - email
+            Schema:
+                - AttributeDataType: String
+                  Name: email
+                  Required: true
+            # LambdaConfig:
+            #     PreTokenGeneration: !GetAtt CognitoPretokenTriggerFunction.Arn
+
+    MsIdCognitoUserPoolClient:
+        Type: AWS::Cognito::UserPoolClient
+        Properties:
+            UserPoolId: !Ref MsIdCognitoUserPool
+            ClientName: MsIdClient
+            GenerateSecret: false
+            # You can edit this in the future to match your desired callback URL
+            CallbackURLs:
+                - https://soffredi.org
+            AllowedOAuthFlowsUserPoolClient: true
+            AllowedOAuthFlows:
+                - code
+                - implicit
+            AllowedOAuthScopes:
+                - email
+                - openid
+                - profile
+                - aws.cognito.signin.user.admin
+            SupportedIdentityProviders:
+                - COGNITO
+    MsIdCognitoDomain:
+        Type: AWS::Cognito::UserPoolDomain
+        Properties:
+            UserPoolId: !Ref MsIdCognitoUserPool
+            Domain: !Ref AuthDomainName
+
+    MsIdInputUserDeletedEventRule:
+        Type: AWS::Events::Rule
+        Properties:
+            # EventBusName: !GetAtt EventBus.Arn
+            Description: 'User deleted event for authentication service'
+            EventPattern:
+                source:
+                    - 'user-service'
+                detail:
+                    type:
+                        - 'user.deleted'
+            State: 'ENABLED'
+            Targets:
+                - Arn: !GetAtt MsIdEventsFunction.Arn
+                  Id: 'id.input.user.deleted'
+
+    PermissionForEventsToInvokeLambdaOnUserDeleted:
+        Type: AWS::Lambda::Permission
+        Properties:
+            FunctionName:
+                Ref: 'MsIdEventsFunction'
+            Action: 'lambda:InvokeFunction'
+            Principal: 'events.amazonaws.com'
+            SourceArn: !GetAtt MsIdInputUserDeletedEventRule.Arn
+
+    MsIdInputUserCreatedEventRule:
+        Type: AWS::Events::Rule
+        Properties:
+            # EventBusName: !GetAtt EventBus.Arn
+            Description: 'User created event for authentication service'
+            EventPattern:
+                source:
+                    - 'user-service'
+                detail:
+                    type:
+                        - 'user.created'
+            State: 'ENABLED'
+            Targets:
+                - Arn: !GetAtt MsIdEventsFunction.Arn
+                  Id: 'id.input.user.created'
+
+    PermissionForEventsToInvokeLambdaOnUserCreated:
+        Type: AWS::Lambda::Permission
+        Properties:
+            FunctionName:
+                Ref: 'MsIdEventsFunction'
+            Action: 'lambda:InvokeFunction'
+            Principal: 'events.amazonaws.com'
+            SourceArn: !GetAtt MsIdInputUserCreatedEventRule.Arn
+
+    # PermissionForCognitoToInvokeLambda:
+    #     Type: AWS::Lambda::Permission
+    #     Properties:
+    #         FunctionName:
+    #             Ref: 'CognitoPretokenTriggerFunction'
+    #         Action: 'lambda:InvokeFunction'
+    #         Principal: 'cognito-idp.amazonaws.com'
+    #         SourceArn: !GetAtt MsAuthCognitoUserPool.Arn
