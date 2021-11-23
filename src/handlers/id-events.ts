@@ -19,39 +19,30 @@ export const handler = async (
     callback: Callback,
 ): Promise<void> => {
     console.log('Received event:', event);
-    console.log(process.env);
 
     const eventType = _.get(event, Config.events.inputEvents.eventTypeLocation);
     let error: string | null = null;
 
-    // User deleted event
-    // if (eventType === events.UserDeleted.type) {
-    //     try {
-    //         error = await userDeletedEventHandler(
-    //             event as EventBridgeEvent<string, UserDeletedEventDataType>,
-    //         );
-    //     } catch (err) {
-    //         console.error(err);
+    if (!process.env.USER_POOL_ID || process.env.USER_POOL_ID.trim() === '') {
+        error = 'Environment variable USER_POOL_ID not found';
+    }
 
-    //         if (err instanceof CustomError) {
-    //             error = JSON.stringify(err.serializeErrors());
-    //         }
-    //     }
-    // } else
-    if (eventType === events.UserCreated.type) {
-        try {
-            error = await userCreatedEventHandler(
-                event as EventBridgeEvent<string, UserCreatedEventDataType>,
-            );
-        } catch (err) {
-            console.error(err);
+    if (!error) {
+        if (eventType === events.UserCreated.type) {
+            try {
+                error = await userCreatedEventHandler(
+                    event as EventBridgeEvent<string, UserCreatedEventDataType>,
+                );
+            } catch (err) {
+                console.error(err);
 
-            if (err instanceof CustomError) {
-                error = JSON.stringify(err.serializeErrors());
+                if (err instanceof CustomError) {
+                    error = JSON.stringify(err.serializeErrors());
+                }
             }
+        } else {
+            error = `Event type ${event['detail-type']} with detail type ${event.detail.type} not processed`;
         }
-    } else {
-        error = `Event type ${event['detail-type']} with detail type ${event.detail.type} not processed`;
     }
 
     if (callback) {
