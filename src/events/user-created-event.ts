@@ -52,7 +52,7 @@ export const userCreatedEventHandler: EventHandler<
                 Value: userEmail,
             },
             {
-                Name: 'userId',
+                Name: 'custom:userId',
                 Value: userId,
             },
         ],
