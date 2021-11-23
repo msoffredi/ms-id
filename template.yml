@@ -72,7 +72,6 @@ Resources:
                 - AttributeDataType: String
                   Mutable: false
                   Name: userId
-                  Required: true
             # LambdaConfig:
             #     PreTokenGeneration: !GetAtt CognitoPretokenTriggerFunction.Arn
 
