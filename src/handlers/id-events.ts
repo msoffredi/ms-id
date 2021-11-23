@@ -19,6 +19,7 @@ export const handler = async (
     callback: Callback,
 ): Promise<void> => {
     console.log('Received event:', event);
+    console.log(process.env);
 
     const eventType = _.get(event, Config.events.inputEvents.eventTypeLocation);
     let error: string | null = null;
