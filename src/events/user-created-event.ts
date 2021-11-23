@@ -44,12 +44,16 @@ export const userCreatedEventHandler: EventHandler<
 
     const newUserParams = {
         UserPoolId: process.env.USER_POOL_ID as string,
-        Username: userId,
+        Username: userEmail,
         DesiredDeliveryMediums: ['EMAIL'],
         UserAttributes: [
             {
                 Name: 'email',
                 Value: userEmail,
+            },
+            {
+                Name: 'userId',
+                Value: userId,
             },
         ],
     };

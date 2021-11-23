@@ -69,6 +69,10 @@ Resources:
                 - AttributeDataType: String
                   Name: email
                   Required: true
+                - AttributeDataType: String
+                  Mutable: false
+                  Name: userId
+                  Required: true
             # LambdaConfig:
             #     PreTokenGeneration: !GetAtt CognitoPretokenTriggerFunction.Arn
 
