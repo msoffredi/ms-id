@@ -1,3 +1,4 @@
+import AWS from 'aws-sdk';
 import {
     EventHandler,
     RequestValidationError,
@@ -26,6 +27,46 @@ export const userCreatedEventHandler: EventHandler<
             },
         ]);
     }
+
+    const userEmail = _.get(
+        event,
+        Config.events.inputEvents.events.userCreated.userEmailLocation,
+    );
+
+    if (!userEmail) {
+        throw new RequestValidationError([
+            {
+                message: 'user email missing in event detail.data',
+                field: 'email',
+            },
+        ]);
+    }
+
+    const newUserParams = {
+        UserPoolId: process.env.USER_POOL_ID as string,
+        Username: userId,
+        DesiredDeliveryMediums: ['EMAIL'],
+        UserAttributes: [
+            {
+                Name: 'email',
+                Value: userEmail,
+            },
+        ],
+    };
+
+    const cognitoidentityserviceprovider =
+        new AWS.CognitoIdentityServiceProvider();
+
+    cognitoidentityserviceprovider.adminCreateUser(
+        newUserParams,
+        (err, data) => {
+            if (err) {
+                console.error(err);
+            } else {
+                console.log(data);
+            }
+        },
+    );
 
     // const user = await User.get(userId);
 
