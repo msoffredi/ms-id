@@ -28,20 +28,20 @@ export const handler = async (
     }
 
     if (!error) {
-        if (eventType === events.UserCreated.type) {
-            try {
-                error = await userCreatedEventHandler(
+        try {
+            if (eventType === events.UserCreated.type) {
+                error = userCreatedEventHandler(
                     event as EventBridgeEvent<string, UserCreatedEventDataType>,
                 );
-            } catch (err) {
-                console.error(err);
-
-                if (err instanceof CustomError) {
-                    error = JSON.stringify(err.serializeErrors());
-                }
+            } else {
+                error = `Event type ${event['detail-type']} with detail type ${event.detail.type} not processed`;
             }
-        } else {
-            error = `Event type ${event['detail-type']} with detail type ${event.detail.type} not processed`;
+        } catch (err) {
+            console.error(err);
+
+            if (err instanceof CustomError) {
+                error = JSON.stringify(err.serializeErrors());
+            }
         }
     }
 
