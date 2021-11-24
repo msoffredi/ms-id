@@ -49,7 +49,7 @@ TBD
 
 ### Preparing your service for a local start
 
-In order for the service to start locally t
+You can't get a full local solution since AWS SAM does not support local Cognito. However, you can trigger the lambdas locally and test them to some extend.
 
 Configure your local environment by copying `env.json.sample` into a new file named `env.json` (edit the file if desired although for testing purposes the sample file should be enough).
 
