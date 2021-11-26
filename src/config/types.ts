@@ -10,6 +10,7 @@ export interface ConfigType {
                 userDeleted: {
                     eventType: string;
                     userIdLocation: string;
+                    userEmailLocation: string;
                 };
                 userCreated: {
                     eventType: string;

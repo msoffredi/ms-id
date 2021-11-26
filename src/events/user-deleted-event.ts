@@ -15,23 +15,32 @@ export const userDeletedEventHandler = (
     );
 
     if (userId) {
-        const cognitoidentityserviceprovider =
-            new AWS.CognitoIdentityServiceProvider();
-
-        cognitoidentityserviceprovider.adminDeleteUser(
-            {
-                UserPoolId: process.env.USER_POOL_ID as string,
-                Username: 'test@test.com',
-            },
-            (err, data) => {
-                if (err) {
-                    console.error(err);
-                    error = err.message;
-                } else {
-                    console.log(data);
-                }
-            },
+        const userEmail = _.get(
+            event,
+            Config.events.inputEvents.events.userCreated.userEmailLocation,
         );
+
+        if (userEmail) {
+            const cognitoidentityserviceprovider =
+                new AWS.CognitoIdentityServiceProvider();
+
+            cognitoidentityserviceprovider.adminDeleteUser(
+                {
+                    UserPoolId: process.env.USER_POOL_ID as string,
+                    Username: userEmail,
+                },
+                (err, data) => {
+                    if (err) {
+                        console.error(err);
+                        error = err.message;
+                    } else {
+                        console.log(data);
+                    }
+                },
+            );
+        } else {
+            error = 'User email missing in event detail.data';
+        }
     } else {
         error = 'User id missing in event detail.data';
     }
