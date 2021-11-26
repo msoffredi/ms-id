@@ -72,8 +72,6 @@ Resources:
                 - AttributeDataType: String
                   Mutable: false
                   Name: userId
-            # LambdaConfig:
-            #     PreTokenGeneration: !GetAtt CognitoPretokenTriggerFunction.Arn
 
     MsIdCognitoUserPoolClient:
         Type: AWS::Cognito::UserPoolClient
@@ -104,7 +102,6 @@ Resources:
     MsIdInputUserDeletedEventRule:
         Type: AWS::Events::Rule
         Properties:
-            # EventBusName: !GetAtt EventBus.Arn
             Description: 'User deleted event for authentication service'
             EventPattern:
                 source:
@@ -129,7 +126,6 @@ Resources:
     MsIdInputUserCreatedEventRule:
         Type: AWS::Events::Rule
         Properties:
-            # EventBusName: !GetAtt EventBus.Arn
             Description: 'User created event for authentication service'
             EventPattern:
                 source:
@@ -150,12 +146,3 @@ Resources:
             Action: 'lambda:InvokeFunction'
             Principal: 'events.amazonaws.com'
             SourceArn: !GetAtt MsIdInputUserCreatedEventRule.Arn
-
-    # PermissionForCognitoToInvokeLambda:
-    #     Type: AWS::Lambda::Permission
-    #     Properties:
-    #         FunctionName:
-    #             Ref: 'CognitoPretokenTriggerFunction'
-    #         Action: 'lambda:InvokeFunction'
-    #         Principal: 'cognito-idp.amazonaws.com'
-    #         SourceArn: !GetAtt MsAuthCognitoUserPool.Arn
