@@ -7,7 +7,7 @@ import {
     UserCreatedEventDataType,
     UserDeletedEventDataType,
 } from '@jmsoffredi/ms-common';
-// import { userDeletedEventHandler } from '../events/user-deleted-event';
+import { userDeletedEventHandler } from '../events/user-deleted-event';
 import { userCreatedEventHandler } from '../events/user-created-event';
 
 export const handler = async (
@@ -32,6 +32,10 @@ export const handler = async (
             if (eventType === events.UserCreated.type) {
                 error = userCreatedEventHandler(
                     event as EventBridgeEvent<string, UserCreatedEventDataType>,
+                );
+            } else if (eventType === events.UserDeleted.type) {
+                error = userDeletedEventHandler(
+                    event as EventBridgeEvent<string, UserDeletedEventDataType>,
                 );
             } else {
                 error = `Event type ${event['detail-type']} with detail type ${event.detail.type} not processed`;
