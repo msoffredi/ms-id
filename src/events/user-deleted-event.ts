@@ -1,12 +1,15 @@
-import AWS from 'aws-sdk';
 import { UserDeletedEventDataType } from '@jmsoffredi/ms-common';
 import { EventBridgeEvent } from 'aws-lambda';
 import _ from 'lodash';
 import { Config } from '../config';
+import {
+    AdminDeleteUserCommand,
+    CognitoIdentityProviderClient,
+} from '@aws-sdk/client-cognito-identity-provider';
 
-export const userDeletedEventHandler = (
+export const userDeletedEventHandler = async (
     event: EventBridgeEvent<string, UserDeletedEventDataType>,
-): string | null => {
+): Promise<string | null> => {
     let error: string | null = null;
 
     const userId = _.get(
@@ -21,23 +24,26 @@ export const userDeletedEventHandler = (
         );
 
         if (userEmail) {
-            const cognitoidentityserviceprovider =
-                new AWS.CognitoIdentityServiceProvider();
+            const cognitoClient = new CognitoIdentityProviderClient({
+                region: process.env.AWS_REGION,
+            });
+            const command = new AdminDeleteUserCommand({
+                UserPoolId: process.env.USER_POOL_ID as string,
+                Username: userEmail,
+            });
 
-            cognitoidentityserviceprovider.adminDeleteUser(
-                {
-                    UserPoolId: process.env.USER_POOL_ID as string,
-                    Username: userEmail,
-                },
-                (err, data) => {
-                    if (err) {
-                        console.error(err);
-                        error = err.message;
-                    } else {
-                        console.log(data);
-                    }
-                },
-            );
+            try {
+                const response = await cognitoClient.send(command);
+                console.log(response);
+            } catch (err: unknown) {
+                console.error(err);
+
+                if (err instanceof Error) {
+                    error = err.message;
+                } else {
+                    error = 'Unknown error deleting Cognito user';
+                }
+            }
         } else {
             error = 'User email missing in event detail.data';
         }

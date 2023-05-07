@@ -23,18 +23,22 @@ export const handler = async (
     const eventType = _.get(event, Config.events.inputEvents.eventTypeLocation);
     let error: string | null = null;
 
-    if (!process.env.USER_POOL_ID || process.env.USER_POOL_ID.trim() === '') {
+    if (!process.env.USER_POOL_ID) {
         error = 'Environment variable USER_POOL_ID not found';
+    }
+
+    if (!process.env.AWS_REGION) {
+        error = 'Environment variable AWS_REGION not found';
     }
 
     if (!error) {
         try {
             if (eventType === events.UserCreated.type) {
-                error = userCreatedEventHandler(
+                error = await userCreatedEventHandler(
                     event as EventBridgeEvent<string, UserCreatedEventDataType>,
                 );
             } else if (eventType === events.UserDeleted.type) {
-                error = userDeletedEventHandler(
+                error = await userDeletedEventHandler(
                     event as EventBridgeEvent<string, UserDeletedEventDataType>,
                 );
             } else {
