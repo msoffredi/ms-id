@@ -4,12 +4,13 @@ Transform:
     - AWS::Serverless-2016-10-31
 
 Parameters:
+    DeploymentPrefix:
+        Type: String
+        Description: Prefix to be used in multiple places to differentiate different unique deployments
+        Default: dev
     SuperAdminEmail:
         Type: String
         Description: The email address of the default user to be added to the Cognito user pool by default
-    AuthDomainName:
-        Type: String
-        Description: Prefix for the domain name Cognito uses for its UI (must be unique in the entire AWS)
 
 Globals:
     Function:
@@ -18,7 +19,7 @@ Globals:
         Environment:
             Variables:
                 SUPER_ADMIN_EMAIL: !Ref SuperAdminEmail
-        Runtime: nodejs14.x
+        Runtime: nodejs18.x
         MemorySize: 128
         Timeout: 100
 
@@ -28,16 +29,16 @@ Resources:
         Metadata:
             BuildMethod: makefile
         Properties:
+            FunctionName: !Sub 'ms-id-events-${DeploymentPrefix}'
             Handler: dist/handlers/id-events.handler
             Description: Authentication serverless microservice events handler
-            Runtime: nodejs14.x
             Environment:
                 Variables:
                     USER_POOL_ID: !Ref MsIdCognitoUserPool
             Policies:
                 - Statement:
                       - Effect: Allow
-                        Resource: '*'
+                        Resource: !Sub 'arn:aws:cognito-idp:${AWS::Region}:${AWS::AccountId}:userpool/*'
                         Action:
                             - cognito-idp:AdminCreateUser
                             - cognito-idp:AdminDeleteUser
@@ -49,20 +50,21 @@ Resources:
         Metadata:
             BuildMethod: makefile
         Properties:
-            LayerName: 'ms-id-dependencies'
+            LayerName: !Sub 'ms-id-dependencies-${DeploymentPrefix}'
             Description: Runtime dependencies for Lambdas
             ContentUri: ./
             CompatibleRuntimes:
-                - nodejs14.x
+                - nodejs18.x
             RetentionPolicy: Retain
 
     MsIdCognitoUserPool:
         Type: AWS::Cognito::UserPool
         Properties:
-            UserPoolName: MsId
+            UserPoolName: !Sub 'MsId${DeploymentPrefix}'
             Policies:
                 PasswordPolicy:
                     MinimumLength: 8
+                    TemporaryPasswordValidityDays: 2
             UsernameAttributes:
                 - email
             Schema:
@@ -72,6 +74,26 @@ Resources:
                 - AttributeDataType: String
                   Mutable: false
                   Name: userId
+            AccountRecoverySetting:
+                RecoveryMechanisms:
+                    - Name: verified_email
+                      Priority: 1
+            AdminCreateUserConfig:
+                AllowAdminCreateUserOnly: true
+                InviteMessageTemplate:
+                    EmailSubject: 'MS-Id: your temporary password'
+                    EmailMessage: |
+                        Thank you for registering!<br />
+                        <br />
+                        Your temporary password for the username {username} is: {####}<br />
+                        <br />
+                        You will be prompted to change your temporary password on your first login.<br />
+                        Be aware this temporary password will be valid only for 48hs hours, so we<br />
+                        encourage you to complete your registration process as soon as possible.<br />
+                        <br />
+                        You can complete the registration process by signing in at<br />
+                        https://soffredi.org/auth/sign-in <br />
+                        <br />
 
     MsIdCognitoUserPoolClient:
         Type: AWS::Cognito::UserPoolClient
@@ -80,35 +102,28 @@ Resources:
             ClientName: MsIdClient
             GenerateSecret: false
             # You can edit this in the future to match your desired callback URL
-            CallbackURLs:
-                - https://soffredi.org
-            AllowedOAuthFlowsUserPoolClient: true
-            AllowedOAuthFlows:
-                - code
-                - implicit
-            AllowedOAuthScopes:
-                - email
-                - openid
-                - profile
-                - aws.cognito.signin.user.admin
             SupportedIdentityProviders:
                 - COGNITO
-    MsIdCognitoDomain:
-        Type: AWS::Cognito::UserPoolDomain
-        Properties:
-            UserPoolId: !Ref MsIdCognitoUserPool
-            Domain: !Ref AuthDomainName
+            ExplicitAuthFlows:
+                - ALLOW_REFRESH_TOKEN_AUTH
+                - ALLOW_USER_PASSWORD_AUTH
 
     MsIdInputUserDeletedEventRule:
         Type: AWS::Events::Rule
         Properties:
             Description: 'User deleted event for authentication service'
+            EventBusName: !Sub 'ms-dev-${DeploymentPrefix}'
             EventPattern:
                 source:
                     - 'user-service'
                 detail:
                     type:
                         - 'user.deleted'
+                    data:
+                        id:
+                            - exists: true
+                        email:
+                            - exists: true
             State: 'ENABLED'
             Targets:
                 - Arn: !GetAtt MsIdEventsFunction.Arn
@@ -127,12 +142,18 @@ Resources:
         Type: AWS::Events::Rule
         Properties:
             Description: 'User created event for authentication service'
+            EventBusName: !Sub 'ms-dev-${DeploymentPrefix}'
             EventPattern:
                 source:
                     - 'user-service'
                 detail:
                     type:
                         - 'user.created'
+                    data:
+                        id:
+                            - exists: true
+                        email:
+                            - exists: true
             State: 'ENABLED'
             Targets:
                 - Arn: !GetAtt MsIdEventsFunction.Arn
@@ -146,3 +167,16 @@ Resources:
             Action: 'lambda:InvokeFunction'
             Principal: 'events.amazonaws.com'
             SourceArn: !GetAtt MsIdInputUserCreatedEventRule.Arn
+
+    EventBus:
+        Type: AWS::Events::EventBus
+        Properties:
+            Name: !Sub 'ms-dev-${DeploymentPrefix}'
+
+Outputs:
+    MsIdCognitoUserPool:
+        Description: 'Cognito user pool arn'
+        Value: !GetAtt MsIdCognitoUserPool.Arn
+    MsIdCognitoUserPoolClientId:
+        Description: 'Cognito user pool client id'
+        Value: !Ref MsIdCognitoUserPoolClient
